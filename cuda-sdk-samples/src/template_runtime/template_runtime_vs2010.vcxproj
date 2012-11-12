@@ -78,7 +78,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>../../bin/win32/$(Configuration)/</OutDir>
     <IntDir>$(Platform)/$(Configuration)/</IntDir>
-    <IncludePath>$(DXSDK_DIR)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(DXSDK_DIR)\include;$(IncludePath);../../inc</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>../../bin/win64/$(Configuration)/</OutDir>

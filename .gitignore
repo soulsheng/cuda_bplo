@@ -24,3 +24,9 @@
 /cuda-sdk-samples/src/*.suo
 /cuda-sdk-samples/bin/win32/Debug/*.exe
 /cuda-sdk-samples/bin/win32/Debug/*.exe
+/cuda-sdk-samples/bin/win32/Release/*.exe
+/cuda-sdk-samples/bin/win32/Release/*.exe
+/cuda-sdk-samples/bin/win32/Release/*.exe
+/cuda-sdk-samples/src/*.opensdf
+/cuda-sdk-samples/src/*.sdf
+/cuda-sdk-samples/src/ipch/template_runtime_vs2010-3c9b6f64/*.ipch
