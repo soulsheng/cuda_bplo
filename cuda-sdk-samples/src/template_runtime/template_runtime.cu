@@ -74,7 +74,7 @@ int main(int argc, char **argv)
     cout << "=========================" << endl;
     cout << "Self-test started" << endl;
 
-    const int N = 100;
+    const int N = (2<<20);
 
     processArgs(argc, argv);
 
@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 
     cout << "Memory allocated successfully" << endl;
 
-    dim3 cudaBlockSize(32,1,1);
+    dim3 cudaBlockSize(256,1,1);
     dim3 cudaGridSize((N + cudaBlockSize.x - 1) / cudaBlockSize.x, 1, 1);
     sequence_gpu<<<cudaGridSize, cudaBlockSize>>>(d_ptr, N);
     ASSERT(cudaSuccess == cudaGetLastError(), "Kernel launch failed", -1);
