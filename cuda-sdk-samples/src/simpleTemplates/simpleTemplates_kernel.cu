@@ -31,25 +31,12 @@ template<class T>
 __global__ void
 testKernel( T* g_idata, T* g_odata) 
 {
-  // Shared mem size is determined by the host app at run time
-  SharedMemory<T> smem;
-  T* sdata = smem.getPointer();
-
-  // access thread id
-  const unsigned int tid = threadIdx.x;
-  // access number of threads in this block
-  const unsigned int num_threads = blockDim.x;
-
-  // read in input data from global memory
-  sdata[tid] = g_idata[tid];
-  __syncthreads();
-
-  // perform some computations
-  sdata[tid] = (T) num_threads * sdata[tid];
-  __syncthreads();
-
-  // write data to global memory
-  g_odata[tid] = sdata[tid];
+	int block = blockIdx.x + blockIdx.y * gridDim.x;
+	int index = threadIdx.x + block * blockDim.x;
+	
+	float a0 = g_idata[index].x;
+	
+	g_odata[index].x = a0;
 }
 
 #endif // #ifndef _TEMPLATE_KERNEL_H_

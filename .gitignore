@@ -32,3 +32,5 @@
 /cuda-sdk-samples/src/ipch/template_runtime_vs2010-3c9b6f64/*.ipch
 /cuda-sdk-samples/src/ipch/template_runtime_vs2010-88957b58/*.ipch
 /cuda-sdk-samples/bin/win32/Release/template_runtime
+/cuda-sdk-samples/src/ipch/simpletemplates_vs2010-c958912c/*.ipch
+/cuda-sdk-samples/bin/win32/Release/*.nvp

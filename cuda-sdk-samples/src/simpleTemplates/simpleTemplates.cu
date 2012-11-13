@@ -208,10 +208,10 @@ template<class T>
 void
 computeGold( T* reference, T* idata, const unsigned int len) 
 {
-    const T T_len = static_cast<T>( len);
+    //const T T_len = static_cast<T>( len);
     for( unsigned int i = 0; i < len; ++i) 
     {
-        reference[i] = idata[i] * T_len;
+        reference[i].x = idata[i].x * len;
     }
 }
 
@@ -223,10 +223,10 @@ main( int argc, char** argv)
 {
     shrQAStart(argc, argv);
 
-    printf("> runTest<float,32>\n");
-    runTest<float>( argc, argv, 32);
-    printf("> runTest<int,64>\n");
-    runTest<int>( argc, argv, 64);
+    printf("> runTest<float,1k>\n");
+    runTest<float1>( argc, argv, (1<<12));
+    //printf("> runTest<int,64>\n");
+    //runTest<int>( argc, argv, 64);
 
     printf("\n[simpleTemplates] -> Test Results: %d Failures\n", g_TotalFailures);
 
@@ -335,7 +335,7 @@ runTest( int argc, char** argv, int len)
     // initalize the memory
     for( unsigned int i = 0; i < num_threads; ++i) 
     {
-        h_idata[i] = (T) i;
+        h_idata[i].x = (float) i;
     }
 
     // allocate device memory
@@ -350,8 +350,10 @@ runTest( int argc, char** argv, int len)
     checkCudaErrors( cudaMalloc( (void**) &d_odata, mem_size));
 
     // setup execution parameters
-    dim3  grid( 1, 1, 1);
-    dim3  threads( num_threads, 1, 1);
+	int nSizeBlock = num_threads>256? 256:num_threads;
+	int nSizeGrid = (num_threads + nSizeBlock-1 )/nSizeBlock;
+    dim3  grid( nSizeGrid, 1, 1);
+    dim3  threads( nSizeBlock, 1, 1);
 
     // execute the kernel
     testKernel<T><<< grid, threads, mem_size >>>( d_idata, d_odata);
