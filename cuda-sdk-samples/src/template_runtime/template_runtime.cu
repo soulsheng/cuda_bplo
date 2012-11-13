@@ -74,7 +74,7 @@ int main(int argc, char **argv)
     cout << "=========================" << endl;
     cout << "Self-test started" << endl;
 
-    const int N = (2<<20);
+    const int N = (1<<20);
 
     processArgs(argc, argv);
 
