@@ -41,9 +41,10 @@ bool g_bQATest = false;
 __global__ void sequence_gpu(int *d_ptr, int length)
 {
     int elemID = blockIdx.x * blockDim.x + threadIdx.x;
-    if (elemID < length)
+    //if (elemID < length)
+	for( int i=elemID; i<length; i+=blockDim.x * gridDim.x )
     {
-        d_ptr[elemID] = elemID;
+        d_ptr[i] = i;
     }
 }
 
@@ -87,7 +88,7 @@ int main(int argc, char **argv)
     cout << "Memory allocated successfully" << endl;
 
     dim3 cudaBlockSize(256,1,1);
-    dim3 cudaGridSize((N + cudaBlockSize.x - 1) / cudaBlockSize.x, 1, 1);
+    dim3 cudaGridSize(56, 1, 1);
     sequence_gpu<<<cudaGridSize, cudaBlockSize>>>(d_ptr, N);
     ASSERT(cudaSuccess == cudaGetLastError(), "Kernel launch failed", -1);
     ASSERT(cudaSuccess == cudaDeviceSynchronize(), "Kernel synchronization failed", -1);
