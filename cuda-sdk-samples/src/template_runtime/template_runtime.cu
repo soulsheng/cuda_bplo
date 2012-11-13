@@ -23,6 +23,8 @@ using namespace std;
 
 bool g_bQATest = false;
 
+#define IPL	2
+
 #ifdef _WIN32
    #define STRCASECMP  _stricmp
    #define STRNCASECMP _strnicmp
@@ -41,11 +43,21 @@ bool g_bQATest = false;
 __global__ void sequence_gpu(int *d_ptr, int length)
 {
     int elemID = blockIdx.x * blockDim.x + threadIdx.x;
-    //if (elemID < length)
-	for( int i=elemID; i<length; i+=blockDim.x * gridDim.x )
-    {
-        d_ptr[i] = i;
-    }
+#if !(IPL-1)
+	if (elemID<length)
+	{
+		d_ptr[elemID]=elemID;
+	}
+#else
+	if (elemID+blockIdx.x * blockDim.x*(IPL-1)<length)
+	{
+#pragma unroll 
+		for (int j=0;j<IPL;j++)
+		{		
+			d_ptr[elemID + j*blockIdx.x * blockDim.x] = elemID;
+		}
+	}
+#endif
 }
 
 
@@ -88,7 +100,7 @@ int main(int argc, char **argv)
     cout << "Memory allocated successfully" << endl;
 
     dim3 cudaBlockSize(256,1,1);
-    dim3 cudaGridSize(56, 1, 1);
+    dim3 cudaGridSize( (N + cudaBlockSize.x - 1) / cudaBlockSize.x /IPL, 1, 1);
     sequence_gpu<<<cudaGridSize, cudaBlockSize>>>(d_ptr, N);
     ASSERT(cudaSuccess == cudaGetLastError(), "Kernel launch failed", -1);
     ASSERT(cudaSuccess == cudaDeviceSynchronize(), "Kernel synchronization failed", -1);
