@@ -373,8 +373,20 @@ runTest( int argc, char** argv, int len)
 
     // setup execution parameters
 	int nSizeBlock = num_threads>256? 256:num_threads;
-	int nSizeGrid = (num_threads + nSizeBlock-1 )/nSizeBlock;
-    dim3  grid( nSizeGrid, 1, 1);
+	int nSizeGridAll = (num_threads + nSizeBlock-1 )/nSizeBlock;
+	int nSizeGridX, nSizeGridY;
+	if( nSizeGridAll>256 )  
+	{
+		nSizeGridX=256;
+		nSizeGridY= (nSizeGridAll + nSizeGridX - 1)/nSizeGridX;
+	}
+	else
+	{
+		nSizeGridX = nSizeGridAll;
+		nSizeGridY = 1;
+	}
+	
+    dim3  grid( nSizeGridX, nSizeGridY, 1);
     dim3  threads( nSizeBlock, 1, 1);
 
 	sdkStartTimer ( &timer );
