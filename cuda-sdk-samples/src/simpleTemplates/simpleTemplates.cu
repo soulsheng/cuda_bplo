@@ -32,6 +32,15 @@
 // includes, kernels
 #include "simpleTemplates_kernel.cu"
 
+#define ALIGNED   0
+
+#if ALIGNED
+typedef float1	F1;
+#else
+struct tagF1{float x;};
+typedef tagF1  F1;
+#endif
+
 int g_TotalFailures = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -224,7 +233,7 @@ main( int argc, char** argv)
     shrQAStart(argc, argv);
 
     printf("> runTest<float,1k>\n");
-    runTest<float1>( argc, argv, (1<<12));
+    runTest<F1>( argc, argv, (1<<20));
     //printf("> runTest<int,64>\n");
     //runTest<int>( argc, argv, 64);
 
@@ -325,7 +334,6 @@ runTest( int argc, char** argv, int len)
 
     StopWatchInterface *timer = NULL;
     sdkCreateTimer( &timer );
-    sdkStartTimer ( &timer );
 
     unsigned int num_threads = len;
     unsigned int mem_size = sizeof( float) * num_threads;
@@ -355,10 +363,19 @@ runTest( int argc, char** argv, int len)
     dim3  grid( nSizeGrid, 1, 1);
     dim3  threads( nSizeBlock, 1, 1);
 
-    // execute the kernel
-    testKernel<T><<< grid, threads, mem_size >>>( d_idata, d_odata);
+	sdkStartTimer ( &timer );
 
-    // check if kernel execution generated and error
+    // execute the kernel
+    testKernel<T><<< grid, threads >>>( d_idata, d_odata);
+
+	cudaDeviceSynchronize();
+    sdkStopTimer( &timer );
+
+	float kernelTime = sdkGetTimerValue( &timer );
+   printf( "Processing time: %f (ms), Bandwidth: %0.3f (GB/s)\n", kernelTime, 1.0e-6*mem_size*2/kernelTime );
+    sdkDeleteTimer( &timer );
+
+     // check if kernel execution generated and error
     getLastCudaError("Kernel execution failed");
 
     // allocate mem for the result on host side
@@ -366,10 +383,6 @@ runTest( int argc, char** argv, int len)
     // copy result from device to host
     checkCudaErrors( cudaMemcpy( h_odata, d_odata, sizeof(T) * num_threads,
                                 cudaMemcpyDeviceToHost) );
-
-    sdkStopTimer( &timer );
-    printf( "Processing time: %f (ms)\n", sdkGetTimerValue( &timer ));
-    sdkDeleteTimer( &timer );
 
     // compute reference solution
     T* reference = (T*) malloc( mem_size);
