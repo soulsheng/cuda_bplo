@@ -32,7 +32,8 @@
 // includes, kernels
 #include "simpleTemplates_kernel.cu"
 
-#define ALIGNED   0
+#define SIZE_ELEMENT		(1<<20)// 1M£¬Ò»°ÙÎå
+#define ALIGNED   1
 
 #if ALIGNED
 typedef float1	F1;
@@ -242,7 +243,11 @@ main( int argc, char** argv)
     shrQAStart(argc, argv);
 
     printf("> runTest<float,1k>\n");
-    runTest<F2>( argc, argv, (1<<20));
+	int sizeElement = SIZE_ELEMENT; 
+    runTest<F1>( argc, argv, sizeElement);
+    runTest<F2>( argc, argv, sizeElement);
+    runTest<F3>( argc, argv, sizeElement);
+    runTest<F4>( argc, argv, sizeElement);
     //printf("> runTest<int,64>\n");
     //runTest<int>( argc, argv, 64);
 
@@ -381,7 +386,7 @@ runTest( int argc, char** argv, int len)
     sdkStopTimer( &timer );
 
 	float kernelTime = sdkGetTimerValue( &timer );
-   printf( "Processing time: %f (ms), Bandwidth: %0.3f (GB/s)\n", kernelTime, 1.0e-6*mem_size*2/kernelTime );
+   printf( "Processing time: %f (ms), Memory Size: %.1f (MB), Bandwidth: %0.3f (GB/s)\n", kernelTime, 1.0e-6*mem_size*2, 1.0e-6*mem_size*2/kernelTime );
     sdkDeleteTimer( &timer );
 
      // check if kernel execution generated and error
