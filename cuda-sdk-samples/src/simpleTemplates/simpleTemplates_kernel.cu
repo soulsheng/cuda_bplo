@@ -34,9 +34,9 @@ testKernel( T* g_idata, T* g_odata)
 	int block = blockIdx.x + blockIdx.y * gridDim.x;
 	int index = threadIdx.x + block * blockDim.x;
 	
-	float a0 = g_idata[index].x;
+	T a0 = g_idata[index];
 	
-	g_odata[index].x = a0;
+	g_odata[index] = a0;
 }
 
 #endif // #ifndef _TEMPLATE_KERNEL_H_

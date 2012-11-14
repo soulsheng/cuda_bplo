@@ -18,12 +18,22 @@
 #include <iostream>
 
 #include <shrQATest.h>
+#include <vector_types.h>
 
 using namespace std;
 
 bool g_bQATest = false;
 
 #define IPL	2
+
+#define ALIGNED   1
+
+#if ALIGNED
+typedef int1 INT1;
+#else
+struct tagInt1{int x;};
+typedef tagInt1  INT1;
+#endif
 
 #ifdef _WIN32
    #define STRCASECMP  _stricmp
@@ -40,7 +50,7 @@ bool g_bQATest = false;
         return retcode; \
     }
 
-__global__ void sequence_gpu(int *d_ptr, int length)
+__global__ void sequence_gpu(INT1 *d_ptr, int1 length)
 {
     int elemID = blockIdx.x * blockDim.x + threadIdx.x;
 #if !(IPL-1)
@@ -49,23 +59,27 @@ __global__ void sequence_gpu(int *d_ptr, int length)
 		d_ptr[elemID]=elemID;
 	}
 #else
-	if (elemID+blockIdx.x * blockDim.x*(IPL-1)<length)
+	if (elemID+blockIdx.x * blockDim.x*(IPL-1)<length.x)
 	{
 #pragma unroll 
 		for (int j=0;j<IPL;j++)
-		{		
-			d_ptr[elemID + j*blockIdx.x * blockDim.x] = elemID;
+		{	
+			INT1 value1;
+			value1.x = elemID;
+			d_ptr[elemID + j*blockIdx.x * blockDim.x] = value1;
 		}
 	}
 #endif
 }
 
 
-void sequence_cpu(int *h_ptr, int length)
+void sequence_cpu(INT1 *h_ptr, int1 length)
 {
-    for (int elemID=0; elemID<length; elemID++)
+    for (int elemID=0; elemID<length.x; elemID++)
     {
-        h_ptr[elemID] = elemID;
+		INT1 value1;
+		value1.x = elemID;
+        h_ptr[elemID] = value1;
     }
 }
 
@@ -91,31 +105,31 @@ int main(int argc, char **argv)
 
     processArgs(argc, argv);
 
-    int *d_ptr;
-    ASSERT(cudaSuccess == cudaMalloc    (&d_ptr, N * sizeof(int)), "Device allocation of " << N << " ints failed", -1);
+    INT1 *d_ptr;
+    ASSERT(cudaSuccess == cudaMalloc    (&d_ptr, N * sizeof(INT1)), "Device allocation of " << N << " ints failed", -1);
 
-    int *h_ptr;
-    ASSERT(cudaSuccess == cudaMallocHost(&h_ptr, N * sizeof(int)), "Host allocation of "   << N << " ints failed", -1);
+    INT1 *h_ptr;
+    ASSERT(cudaSuccess == cudaMallocHost(&h_ptr, N * sizeof(INT1)), "Host allocation of "   << N << " ints failed", -1);
 
     cout << "Memory allocated successfully" << endl;
 
     dim3 cudaBlockSize(256,1,1);
     dim3 cudaGridSize( (N + cudaBlockSize.x - 1) / cudaBlockSize.x /IPL, 1, 1);
-    sequence_gpu<<<cudaGridSize, cudaBlockSize>>>(d_ptr, N);
+    sequence_gpu<<<cudaGridSize, cudaBlockSize>>>(d_ptr, make_int1(N) );
     ASSERT(cudaSuccess == cudaGetLastError(), "Kernel launch failed", -1);
     ASSERT(cudaSuccess == cudaDeviceSynchronize(), "Kernel synchronization failed", -1);
 
-    sequence_cpu(h_ptr, N);
+    sequence_cpu(h_ptr, make_int1(N));
 
     cout << "CUDA and CPU algorithm implementations finished" << endl;
 
-    int *h_d_ptr;
-    ASSERT(cudaSuccess == cudaMallocHost(&h_d_ptr, N * sizeof(int)), "Host allocation of " << N << " ints failed", -1);
-    ASSERT(cudaSuccess == cudaMemcpy(h_d_ptr, d_ptr, N * sizeof(int), cudaMemcpyDeviceToHost), "Copy of " << N << " ints from device to host failed", -1);
+    INT1 *h_d_ptr;
+    ASSERT(cudaSuccess == cudaMallocHost(&h_d_ptr, N * sizeof(INT1)), "Host allocation of " << N << " ints failed", -1);
+    ASSERT(cudaSuccess == cudaMemcpy(h_d_ptr, d_ptr, N * sizeof(INT1), cudaMemcpyDeviceToHost), "Copy of " << N << " ints from device to host failed", -1);
     bool bValid = true;
     for (int i=0; i<N && bValid; i++)
     {
-        if (h_ptr[i] != h_d_ptr[i])
+        if (h_ptr[i].x != h_d_ptr[i].x)
         {
             bValid = false;
         }
