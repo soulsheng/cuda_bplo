@@ -36,9 +36,18 @@
 
 #if ALIGNED
 typedef float1	F1;
+typedef float2	F2;
+typedef float3	F3;
+typedef float4	F4;
 #else
 struct tagF1{float x;};
 typedef tagF1  F1;
+struct tagF2{float x,y;};
+typedef tagF2  F2;
+struct tagF3{float x,y,z;};
+typedef tagF3  F3;
+struct tagF4{float x,y,z,w;};
+typedef tagF4  F4;
 #endif
 
 int g_TotalFailures = 0;
@@ -233,7 +242,7 @@ main( int argc, char** argv)
     shrQAStart(argc, argv);
 
     printf("> runTest<float,1k>\n");
-    runTest<F1>( argc, argv, (1<<20));
+    runTest<F2>( argc, argv, (1<<20));
     //printf("> runTest<int,64>\n");
     //runTest<int>( argc, argv, 64);
 
@@ -336,7 +345,7 @@ runTest( int argc, char** argv, int len)
     sdkCreateTimer( &timer );
 
     unsigned int num_threads = len;
-    unsigned int mem_size = sizeof( float) * num_threads;
+    unsigned int mem_size = sizeof( T) * num_threads;
 
     // allocate host memory
     T* h_idata = (T*) malloc( mem_size);
