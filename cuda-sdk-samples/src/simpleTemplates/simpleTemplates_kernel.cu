@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include "sharedmem.cuh"
 
-#define		IPL				2
+#define		IPL				4// 1 2 4 8
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Simple test kernel for device functionality
@@ -35,12 +35,15 @@ testKernel( T* g_idata, T* g_odata)
 	int block = blockIdx.x + blockIdx.y * gridDim.x;
 	int index = threadIdx.x + IPL*block * blockDim.x;
 #if 1
-#pragma unroll
+	T a[IPL];
+//#pragma unroll
 	for(int i=0; i<IPL; i++)
-	{
-		T ai = g_idata[index+i * blockDim.x];
-		g_odata[index+i * blockDim.x] = ai;
-	}
+		a[i] = g_idata[index+i * blockDim.x];
+
+//#pragma unroll
+	for(int i=0; i<IPL; i++)
+		g_odata[index+i * blockDim.x] = a[i];
+	
 #else
 	T a0 = g_idata[index];
 	T a1 = g_idata[index+blockDim.x];

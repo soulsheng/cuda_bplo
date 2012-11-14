@@ -33,6 +33,11 @@
 #include "simpleTemplates_kernel.cu"
 
 #define SIZE_ELEMENT		(1<<20)// 1M，一百五
+#define SIZE_BLOCK			(512/IPL)
+// 对于gts250 16k容量，  7K, 67%GPU使用率； 15K，33%GPU使用率； 
+// 对于gts670 48k容量，23K, 25%GPU使用率； 47K，13%GPU使用率； 
+#define SIZE_SHARED_MEMORY	((1<<10)*15)  
+
 #define ALIGNED   1
 
 #if ALIGNED
@@ -245,9 +250,9 @@ main( int argc, char** argv)
     printf("> runTest<float,1k>\n");
 	int sizeElement = SIZE_ELEMENT; 
     runTest<F1>( argc, argv, sizeElement);
-    runTest<F2>( argc, argv, sizeElement);
-    runTest<F3>( argc, argv, sizeElement);
-    runTest<F4>( argc, argv, sizeElement);
+    //runTest<F2>( argc, argv, sizeElement);
+    //runTest<F3>( argc, argv, sizeElement);
+    //runTest<F4>( argc, argv, sizeElement);
     //printf("> runTest<int,64>\n");
     //runTest<int>( argc, argv, 64);
 
@@ -372,12 +377,12 @@ runTest( int argc, char** argv, int len)
     checkCudaErrors( cudaMalloc( (void**) &d_odata, mem_size));
 
     // setup execution parameters
-	int nSizeBlock = num_threads>256? 256:num_threads;
+	int nSizeBlock = num_threads>SIZE_BLOCK? SIZE_BLOCK:num_threads;
 	int nSizeGridAll = (num_threads + nSizeBlock-1 )/nSizeBlock/IPL;
 	int nSizeGridX, nSizeGridY;
-	if( nSizeGridAll>256 )  
+	if( nSizeGridAll>SIZE_BLOCK )  
 	{
-		nSizeGridX=256;
+		nSizeGridX=SIZE_BLOCK;
 		nSizeGridY= (nSizeGridAll + nSizeGridX - 1)/nSizeGridX;
 	}
 	else
@@ -392,7 +397,7 @@ runTest( int argc, char** argv, int len)
 	sdkStartTimer ( &timer );
 
     // execute the kernel
-    testKernel<T><<< grid, threads >>>( d_idata, d_odata);
+    testKernel<T><<< grid, threads , SIZE_SHARED_MEMORY>>>( d_idata, d_odata);
 
 	cudaDeviceSynchronize();
     sdkStopTimer( &timer );
