@@ -373,7 +373,7 @@ runTest( int argc, char** argv, int len)
 
     // setup execution parameters
 	int nSizeBlock = num_threads>256? 256:num_threads;
-	int nSizeGridAll = (num_threads + nSizeBlock-1 )/nSizeBlock;
+	int nSizeGridAll = (num_threads + nSizeBlock-1 )/nSizeBlock/IPL;
 	int nSizeGridX, nSizeGridY;
 	if( nSizeGridAll>256 )  
 	{
