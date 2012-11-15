@@ -33,7 +33,7 @@
 #include "simpleTemplates_kernel.cu"
 
 #define SIZE_ELEMENT		(1<<20)// 1M，一百五
-#define SIZE_BLOCK			(512/IPL)
+#define SIZE_BLOCK			(128/IPL)
 // 对于gts250 16k容量，  7K, 67%GPU使用率； 15K，33%GPU使用率； 
 // 对于gts670 48k容量，23K, 25%GPU使用率； 47K，13%GPU使用率； 
 #define SIZE_SHARED_MEMORY	((1<<10)*15)  
@@ -249,10 +249,10 @@ main( int argc, char** argv)
 
     printf("> runTest<float,1k>\n");
 	int sizeElement = SIZE_ELEMENT; 
-    runTest<F1>( argc, argv, sizeElement);
+    //runTest<F1>( argc, argv, sizeElement);
     //runTest<F2>( argc, argv, sizeElement);
     //runTest<F3>( argc, argv, sizeElement);
-    //runTest<F4>( argc, argv, sizeElement);
+    runTest<F4>( argc, argv, sizeElement);
     //printf("> runTest<int,64>\n");
     //runTest<int>( argc, argv, 64);
 
