@@ -328,6 +328,7 @@ void runTest(int argc, char** argv)
     int nIter = 30;
 
 	// CUBLAS version 2.0
+	if(0)
 	{
         cublasHandle_t handle;
         checkError(cublasCreate(&handle), "cublasCreate() error!\n");
@@ -402,6 +403,7 @@ void runTest(int argc, char** argv)
 		//Log througput, etc
 		shrLogEx(LOGBOTH | MASTER, 0, "> CUDA matrixMul %.4f GFlop/s, Time = %.5f s, Size = %.0f Ops, ", 
 				gflops, dSeconds, dNumOps);
+		shrLogEx(LOGBOTH | MASTER, 0, "> CUDA   Bandwidth  %.2f GB/s\n\n", 1.0e-9 * (mem_size_A+mem_size_B+mem_size_C)/dSeconds );
 		shrLogEx(LOGBOTH | MASTER, 0, "NumDevsUsed = %d, Workgroup = %u\n", 1, threads.x * threads.y);
 
 		sdkDeleteTimer(&timer_matrixMul);
@@ -414,7 +416,7 @@ void runTest(int argc, char** argv)
     shrLog("\nComparing GPU results with Host computation...\n\n");    
     float* reference = (float*)malloc(mem_size_C);
     computeGold(reference, h_A, h_B, uiHA, uiWA, uiWB);
-
+#if 0
     // check result (CUBLAS)
 	printf("Comparing CUBLAS & Host results\n");
     bool resCUBLAS = sdkCompareL2fe(reference, h_CUBLAS, size_C, 1.0e-6f);
@@ -423,7 +425,7 @@ void runTest(int argc, char** argv)
         printDiff(reference, h_CUBLAS, uiWC, uiHC, 100, 1.0e-5f);
     }
     shrLog("CUBLAS compares %s\n\n", (true == resCUBLAS) ? "OK" : "FAIL");
-
+#endif
     // check result (matrixMul)
 	printf("Comparing CUDA matrixMul & Host results\n");
     bool resCUDA = sdkCompareL2fe(reference, h_C, size_C, 1.0e-6f);
@@ -443,7 +445,7 @@ void runTest(int argc, char** argv)
     checkCudaErrors(cudaFree(d_C));
 
     cudaDeviceReset();
-    shrQAFinishExit(argc, (const char **)argv, (resCUDA == true && resCUBLAS == true) ? QA_PASSED : QA_FAILED);
+    shrQAFinishExit(argc, (const char **)argv, (resCUDA == true ) ? QA_PASSED : QA_FAILED);
 }
 
 // Allocates a matrix with random float entries.
