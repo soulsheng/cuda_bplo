@@ -404,11 +404,12 @@ runTest( int argc, char** argv, int len)
 
 	float kernelTime = sdkGetTimerValue( &timer );
    printf( "Processing time: %f (ms), Memory Size: %.1f (MB), Bandwidth: %0.3f (GB/s)\n", kernelTime, 1.0e-6*mem_size*2, 1.0e-6*mem_size*2/kernelTime );
-    sdkDeleteTimer( &timer );
+   printf( "SIZE BLOCK: %d , Occupancy: %0.2f %%\n", SIZE_BLOCK, SIZE_BLOCK*100.0f/2048 );
+   sdkDeleteTimer( &timer );
 
      // check if kernel execution generated and error
     getLastCudaError("Kernel execution failed");
-
+#if 0
     // allocate mem for the result on host side
     T* h_odata = (T*) malloc( mem_size);
     // copy result from device to host
@@ -436,12 +437,12 @@ runTest( int argc, char** argv, int len)
         printf( "Compare %s\n\n", (1 == res) ? "OK" : "MISMATCH");
         g_TotalFailures += (1 != res);
     }
-
+	free( h_odata);
+	free( reference);
+#endif
     // cleanup memory
     free( h_idata);
-    free( h_odata);
-    free( reference);
-    checkCudaErrors(cudaFree(d_idata));
+	checkCudaErrors(cudaFree(d_idata));
     checkCudaErrors(cudaFree(d_odata));
 
     cudaDeviceReset();
