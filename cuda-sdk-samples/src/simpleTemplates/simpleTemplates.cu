@@ -32,11 +32,11 @@
 // includes, kernels
 #include "simpleTemplates_kernel.cu"
 
-#define SIZE_ELEMENT		(1<<20)// 1M，一百五
-#define SIZE_BLOCK			(128/IPL)
+#define SIZE_ELEMENT		(1<<24)// 1M，一百五
+#define SIZE_BLOCK			(1024/IPL)
 // 对于gts250 16k容量，  7K, 67%GPU使用率； 15K，33%GPU使用率； 
 // 对于gts670 48k容量，23K, 25%GPU使用率； 47K，13%GPU使用率； 
-#define SIZE_SHARED_MEMORY	((1<<10)*15)  
+#define SIZE_SHARED_MEMORY	((1<<10)*47)  
 
 #define ALIGNED   1
 
