@@ -41,6 +41,8 @@
 
 static char *sSDKsample = "matrixMul";
 
+#define SIZE_SHARED_MEMORY	((1<<10)*1)  
+
 ////////////////////////////////////////////////////////////////////////////////
 // These are CUDA Helper functions
 
@@ -250,11 +252,11 @@ void runTest(int argc, char** argv)
 
     // Optional Command-line multiplier for matrix sizes
     unsigned int uiWA, uiHA, uiWB, uiHB, uiWC, uiHC;
-    int iSizeMultiple = 5;
+    int iSizeMultiple = (1<<3);
     if (checkCmdLineFlag( argc, (const char **)argv, "sizemult" )) {
         iSizeMultiple = getCmdLineArgumentInt(argc, (const char**)argv, "sizemult"); 
     }
-    iSizeMultiple = CLAMP(iSizeMultiple, 1, 10);
+    //iSizeMultiple = CLAMP(iSizeMultiple, 1, 10);
 
     bool useCublasOnly = false;
     if(checkCmdLineFlag(argc, (const char**)argv, "cublas"))
@@ -310,8 +312,8 @@ void runTest(int argc, char** argv)
     checkCudaErrors(cudaMalloc((void**) &d_C, mem_size_C));
    
     // setup execution parameters
-    dim3 threads(block_size, block_size);
-    dim3 grid(uiWC / threads.x, uiHC / threads.y);
+    dim3 threads(block_size, block_size/IPL);
+    dim3 grid(uiWC / block_size, uiHC / block_size);
 
     // kernel warmup
     if(useCublasOnly) {
@@ -328,7 +330,7 @@ void runTest(int argc, char** argv)
     int nIter = 30;
 
 	// CUBLAS version 2.0
-	if(0)
+	if(1)
 	{
         cublasHandle_t handle;
         checkError(cublasCreate(&handle), "cublasCreate() error!\n");
@@ -384,9 +386,9 @@ void runTest(int argc, char** argv)
 		sdkStartTimer(&timer_matrixMul);
 		for (int j = 0; j < nIter; j++) {
 			if (block_size == 16) {
-				matrixMul<16><<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
+				matrixMul<16><<< grid, threads ,SIZE_SHARED_MEMORY>>>(d_C, d_A, d_B, uiWA, uiWB);
 			} else {
-				matrixMul<32><<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
+				matrixMul<32><<< grid, threads ,SIZE_SHARED_MEMORY>>>(d_C, d_A, d_B, uiWA, uiWB);
 			}
 		}
 		// check if kernel execution generated and error

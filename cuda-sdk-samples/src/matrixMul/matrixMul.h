@@ -15,7 +15,7 @@
 // Basic Matrix dimensions (can be amplified by command line switch)
 // (chosen as multiples of the thread block size for simplicity)
 #define WA (4 * block_size) // Matrix A width
-#define HA (6 * block_size) // Matrix A height
+#define HA (4 * block_size) // Matrix A height
 #define WB (4 * block_size) // Matrix B width
 #define HB WA  // Matrix B height
 #define WC WB  // Matrix C width 

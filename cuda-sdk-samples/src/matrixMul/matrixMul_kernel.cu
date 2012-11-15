@@ -18,6 +18,8 @@
 
 #include <stdio.h>
 
+#define IPL 8
+
 #define CHECK_BANK_CONFLICTS 0
 #if CHECK_BANK_CONFLICTS
 #define AS(i, j) cutilBankChecker(((float*)&As[0][0]), (BLOCK_SIZE * i + j))
@@ -59,7 +61,7 @@ matrixMul( float* C, float* A, float* B, int wA, int wB)
 
     // Csub is used to store the element of the block sub-matrix
     // that is computed by the thread
-    float Csub = 0;
+	float Csub[IPL] = {0};
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
@@ -78,8 +80,11 @@ matrixMul( float* C, float* A, float* B, int wA, int wB)
         // Load the matrices from device memory
         // to shared memory; each thread loads
         // one element of each matrix
-        AS(ty, tx) = A[a + wA * ty + tx];
-        BS(ty, tx) = B[b + wB * ty + tx];
+#pragma unroll
+		for(int i=0;i<IPL;i++){
+        AS(ty+i*32/IPL, tx) = A[a + wA * (ty+i*32/IPL) + tx];
+        BS(ty+i*32/IPL, tx) = B[b + wB * (ty+i*32/IPL) + tx];
+		}
 
         // Synchronize to make sure the matrices are loaded
         __syncthreads();
@@ -89,8 +94,12 @@ matrixMul( float* C, float* A, float* B, int wA, int wB)
         // of the block sub-matrix
 #pragma unroll
         for (int k = 0; k < BLOCK_SIZE; ++k)
-            Csub += AS(ty, k) * BS(k, tx);
-
+        {    
+#pragma unroll
+			for(int i=0;i<IPL;i++){
+			Csub[i] += AS(ty+i*32/IPL, k) * BS(k, tx);
+			}
+		}
         // Synchronize to make sure that the preceding
         // computation is done before loading two new
         // sub-matrices of A and B in the next iteration
@@ -100,7 +109,10 @@ matrixMul( float* C, float* A, float* B, int wA, int wB)
     // Write the block sub-matrix to device memory;
     // each thread writes one element
     int c = wB * BLOCK_SIZE * by + BLOCK_SIZE * bx;
-    C[c + wB * ty + tx] = Csub;
+#pragma unroll
+	for(int i=0;i<IPL;i++){
+	C[c + wB * (ty+i*32/IPL) + tx] = Csub[i];
+	}
 }
 
 #endif // #ifndef _MATRIXMUL_KERNEL_H_
