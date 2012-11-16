@@ -43,3 +43,4 @@
 /cuda-sdk-samples/bin/win32/Release/*.csv
 /cuda-sdk-samples/bin/win32/Release/*.txt
 /cuda-sdk-samples/src/concurrentKernels/*.txt
+/cuda-sdk-samples/src/concurrentKernels/*.o
