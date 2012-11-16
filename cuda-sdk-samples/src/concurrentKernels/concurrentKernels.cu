@@ -18,7 +18,8 @@
 // Devices of compute capability 2.0 or higher can overlap the kernels
 //
 #include <stdio.h>
-#include <cutil_inline.h>
+//#include <cutil_inline.h>
+#include <sdkHelper.h>  // helper for shared functions common to CUDA SDK samples
 #include <shrUtils.h>
 #include <shrQATest.h>
 
@@ -63,6 +64,171 @@ __global__ void sum(clock_t* d_clocks, int N)
 	d_clocks[0] = s_clocks[0];
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// These are CUDA Helper functions
+
+// This will output the proper CUDA error strings in the event that a CUDA host call returns an error
+#define checkCudaErrors(err)  __checkCudaErrors (err, __FILE__, __LINE__)
+
+inline void __checkCudaErrors(cudaError err, const char *file, const int line )
+{
+	if(cudaSuccess != err)
+	{
+		fprintf(stderr, "%s(%i) : CUDA Runtime API error %d: %s.\n",file, line, (int)err, cudaGetErrorString( err ) );
+		exit(-1);        
+	}
+}
+
+// This will output the proper error string when calling cudaGetLastError
+#define getLastCudaError(msg)      __getLastCudaError (msg, __FILE__, __LINE__)
+
+inline void __getLastCudaError(const char *errorMessage, const char *file, const int line )
+{
+	cudaError_t err = cudaGetLastError();
+	if (cudaSuccess != err)
+	{
+		fprintf(stderr, "%s(%i) : getLastCudaError() CUDA error : %s : (%d) %s.\n",
+			file, line, errorMessage, (int)err, cudaGetErrorString( err ) );
+		exit(-1);
+	}
+}
+
+// General GPU Device CUDA Initialization
+int gpuDeviceInit(int devID)
+{
+	int deviceCount;
+	checkCudaErrors(cudaGetDeviceCount(&deviceCount));
+
+	if (deviceCount == 0)
+	{
+		fprintf(stderr, "gpuDeviceInit() CUDA error: no devices supporting CUDA.\n");
+		exit(-1);
+	}
+
+	if (devID < 0)
+		devID = 0;
+
+	if (devID > deviceCount-1)
+	{
+		fprintf(stderr, "\n");
+		fprintf(stderr, ">> %d CUDA capable GPU device(s) detected. <<\n", deviceCount);
+		fprintf(stderr, ">> gpuDeviceInit (-device=%d) is not a valid GPU device. <<\n", devID);
+		fprintf(stderr, "\n");
+		return -devID;
+	}
+
+	cudaDeviceProp deviceProp;
+	checkCudaErrors( cudaGetDeviceProperties(&deviceProp, devID) );
+
+	if (deviceProp.major < 1)
+	{
+		fprintf(stderr, "gpuDeviceInit(): GPU device does not support CUDA.\n");
+		exit(-1);                                                  
+	}
+
+	checkCudaErrors( cudaSetDevice(devID) );
+	printf("gpuDeviceInit() CUDA Device [%d]: \"%s\n", devID, deviceProp.name);
+
+	return devID;
+}
+
+// This function returns the best GPU (with maximum GFLOPS)
+int gpuGetMaxGflopsDeviceId()
+{
+	int current_device     = 0, sm_per_multiproc  = 0;
+	int max_compute_perf   = 0, max_perf_device   = 0;
+	int device_count       = 0, best_SM_arch      = 0;
+	cudaDeviceProp deviceProp;
+	cudaGetDeviceCount( &device_count );
+
+	// Find the best major SM Architecture GPU device
+	while (current_device < device_count)
+	{
+		cudaGetDeviceProperties( &deviceProp, current_device );
+		if (deviceProp.major > 0 && deviceProp.major < 9999)
+		{
+			best_SM_arch = MAX(best_SM_arch, deviceProp.major);
+		}
+		current_device++;
+	}
+
+	// Find the best CUDA capable GPU device
+	current_device = 0;
+	while( current_device < device_count )
+	{
+		cudaGetDeviceProperties( &deviceProp, current_device );
+		if (deviceProp.major == 9999 && deviceProp.minor == 9999)
+		{
+			sm_per_multiproc = 1;
+		}
+		else
+		{
+			sm_per_multiproc = _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor);
+		}
+
+		int compute_perf  = deviceProp.multiProcessorCount * sm_per_multiproc * deviceProp.clockRate;
+
+		if( compute_perf  > max_compute_perf )
+		{
+			// If we find GPU with SM major > 2, search only these
+			if ( best_SM_arch > 2 )
+			{
+				// If our device==dest_SM_arch, choose this, or else pass
+				if (deviceProp.major == best_SM_arch)
+				{
+					max_compute_perf  = compute_perf;
+					max_perf_device   = current_device;
+				}
+			}
+			else
+			{
+				max_compute_perf  = compute_perf;
+				max_perf_device   = current_device;
+			}
+		}
+		++current_device;
+	}
+	return max_perf_device;
+}
+
+// Initialization code to find the best CUDA Device
+int findCudaDevice(int argc, const char **argv)
+{
+	cudaDeviceProp deviceProp;
+	int devID = 0;
+	// If the command-line has a device number specified, use it
+	if (checkCmdLineFlag(argc, argv, "device"))
+	{
+		devID = getCmdLineArgumentInt(argc, argv, "device=");
+		if (devID < 0)
+		{
+			printf("Invalid command line parameter\n ");
+			exit(-1);
+		}
+		else
+		{
+			devID = gpuDeviceInit(devID);
+			if (devID < 0)
+			{
+				printf("exiting...\n");
+				shrQAFinishExit(argc, (const char **)argv, QA_FAILED);
+				exit(-1);
+			}
+		}
+	}
+	else
+	{
+		// Otherwise pick the device with highest Gflops/s
+		devID = gpuGetMaxGflopsDeviceId();
+		checkCudaErrors( cudaSetDevice( devID ) );
+		checkCudaErrors( cudaGetDeviceProperties(&deviceProp, devID) );
+		printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", devID, deviceProp.name, deviceProp.major, deviceProp.minor);
+	}
+	return devID;
+}
+// end of CUDA Helper Functions
+
 int main(int argc, char **argv)
 {
     int nkernels = 8;               // number of concurrent kernels
@@ -75,18 +241,18 @@ int main(int argc, char **argv)
     shrQAStart(argc, argv); 
 
     // get number of kernels if overridden on the command line
-    if (cutCheckCmdLineFlag(argc, (const char **)argv, "nkernels")) {
-        cutGetCmdLineArgumenti(argc, (const char **)argv, "nkernels", &nkernels);
+    if (checkCmdLineFlag(argc, (const char **)argv, "nkernels")) {
+        nkernels = getCmdLineArgumentInt(argc, (const char **)argv, "nkernels");
         nstreams = nkernels + 1;
     }
 
     // use command-line specified CUDA device, otherwise use device with highest Gflops/s
-    cuda_device = cutilChooseCudaDevice(argc, argv);
+    cuda_device = findCudaDevice(argc, (const char**)argv);
 
     cudaDeviceProp deviceProp;
-    cutilSafeCall( cudaGetDevice(&cuda_device));	
+    checkCudaErrors( cudaGetDevice(&cuda_device));	
 
-    cutilSafeCall( cudaGetDeviceProperties(&deviceProp, cuda_device) );
+    checkCudaErrors( cudaGetDeviceProperties(&deviceProp, cuda_device) );
     if( (deviceProp.concurrentKernels == 0 )) {
         shrLog("> GPU does not support concurrent kernel execution\n");
         shrLog("  CUDA kernel runs will be serialized\n");
@@ -97,21 +263,21 @@ int main(int argc, char **argv)
 
     // allocate host memory
     clock_t *a = 0;                     // pointer to the array data in host memory
-    cutilSafeCall( cudaMallocHost((void**)&a, nbytes) ); 
+    checkCudaErrors( cudaMallocHost((void**)&a, nbytes) ); 
 
     // allocate device memory
     clock_t *d_a = 0;             // pointers to data and init value in the device memory
-    cutilSafeCall( cudaMalloc((void**)&d_a, nbytes) );
+    checkCudaErrors( cudaMalloc((void**)&d_a, nbytes) );
 
     // allocate and initialize an array of stream handles
     cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
     for(int i = 0; i < nstreams; i++)
-        cutilSafeCall( cudaStreamCreate(&(streams[i])) );
+        checkCudaErrors( cudaStreamCreate(&(streams[i])) );
 
     // create CUDA event handles
     cudaEvent_t start_event, stop_event;
-    cutilSafeCall( cudaEventCreate(&start_event) );
-    cutilSafeCall( cudaEventCreate(&stop_event) );
+    checkCudaErrors( cudaEventCreate(&start_event) );
+    checkCudaErrors( cudaEventCreate(&stop_event) );
 
    
     // the events are used for synchronization only and hence do not need to record timings
@@ -119,7 +285,7 @@ int main(int argc, char **argv)
     cudaEvent_t *kernelEvent;
     kernelEvent = (cudaEvent_t*) malloc(nkernels * sizeof(cudaEvent_t));
     for(int i = 0; i < nkernels; i++)
-        cutilSafeCall( cudaEventCreateWithFlags(&(kernelEvent[i]), cudaEventDisableTiming) );
+        checkCudaErrors( cudaEventCreateWithFlags(&(kernelEvent[i]), cudaEventDisableTiming) );
 
     //////////////////////////////////////////////////////////////////////
     // time execution with nkernels streams
@@ -132,23 +298,23 @@ int main(int argc, char **argv)
     {
         clock_block<<<1,1,0,streams[i]>>>(&d_a[i], time_clocks );
         total_clocks += time_clocks;
-        cutilSafeCall( cudaEventRecord(kernelEvent[i], streams[i]) );
+        checkCudaErrors( cudaEventRecord(kernelEvent[i], streams[i]) );
 	
         // make the last stream wait for the kernel event to be recorded
-        cutilSafeCall( cudaStreamWaitEvent(streams[nstreams-1], kernelEvent[i],0) );
+        checkCudaErrors( cudaStreamWaitEvent(streams[nstreams-1], kernelEvent[i],0) );
     }
 
     // queue a sum kernel and a copy back to host in the last stream. 
     // the commands in this stream get dispatched as soon as all the kernel events have been recorded
     sum<<<1,32,0,streams[nstreams-1]>>>(d_a, nkernels);
-    cutilSafeCall( cudaMemcpyAsync(a, d_a, sizeof(clock_t), cudaMemcpyDeviceToHost, streams[nstreams-1]) );
+    checkCudaErrors( cudaMemcpyAsync(a, d_a, sizeof(clock_t), cudaMemcpyDeviceToHost, streams[nstreams-1]) );
  
     // at this point the CPU has dispatched all work for the GPU and can continue processing other tasks in parallel
 
     // in this sample we just wait until the GPU is done
-    cutilSafeCall( cudaEventRecord(stop_event, 0) );
-    cutilSafeCall( cudaEventSynchronize(stop_event) );
-    cutilSafeCall( cudaEventElapsedTime(&elapsed_time, start_event, stop_event) );
+    checkCudaErrors( cudaEventRecord(stop_event, 0) );
+    checkCudaErrors( cudaEventSynchronize(stop_event) );
+    checkCudaErrors( cudaEventElapsedTime(&elapsed_time, start_event, stop_event) );
     
     shrLog("Expected time for serial execution of %d kernels = %.3fs\n", nkernels, nkernels * kernel_time/1000.0f);
     shrLog("Expected time for concurrent execution of %d kernels = %.3fs\n", nkernels, kernel_time/1000.0f);
@@ -169,6 +335,6 @@ int main(int argc, char **argv)
     cudaFreeHost(a);
     cudaFree(d_a);
 
-    cutilDeviceReset();
+    cudaDeviceReset();
     shrQAFinishExit(argc, (const char **)argv, (bTestResult) ? QA_PASSED : QA_FAILED);
 }

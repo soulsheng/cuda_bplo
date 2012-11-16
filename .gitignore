@@ -35,3 +35,11 @@
 /cuda-sdk-samples/src/ipch/simpletemplates_vs2010-c958912c/*.ipch
 /cuda-sdk-samples/bin/win32/Release/*.nvp
 /cuda-sdk-samples/src/ipch/simpletemplates_vs2010-8efa1238/*.ipch
+/cuda-sdk-samples/src/concurrentKernels/Win32
+/cuda-sdk-samples/src/concurrentKernels/*.pdb
+/cuda-sdk-samples/src/concurrentKernels/*.user
+/cuda-sdk-samples/src/ipch/concurrentkernels_vs2010-5c0727e8/*.ipch
+/cuda-sdk-samples/src/ipch/matrixmul_vs2010-aec977c0/*.ipch
+/cuda-sdk-samples/bin/win32/Release/*.csv
+/cuda-sdk-samples/bin/win32/Release/*.txt
+/cuda-sdk-samples/src/concurrentKernels/*.txt
