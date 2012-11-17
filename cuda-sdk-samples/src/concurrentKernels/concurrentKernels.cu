@@ -30,6 +30,7 @@ const char *sSDKsample = "concurrentKernels";
 #define SIZE_BLOCK			(1024/IPL)
 #define		SIZE_KERNEL		1// 1 2 4 8
 #define SIZE_SHARED_MEMORY	((1<<10)*1)  
+#define INSTRUCTION_MAX		(100)
 
 // This is a kernel that does no real work but runs at least for a specified number of clocks
 __global__ void clock_block(clock_t* d_o, clock_t clock_count)
@@ -45,6 +46,23 @@ __global__ void clock_block(clock_t* d_o, clock_t clock_count)
 	d_o[0] = clock_offset;
 }
 
+
+__global__ void
+	testReadThenWriteInstMax( float4* g_idata, float4* g_odata) 
+{
+	int block = blockIdx.x + blockIdx.y * gridDim.x;
+	int index = threadIdx.x + block * blockDim.x;
+
+	float4 a;
+
+	a = g_idata[index];
+
+	for(int i=0; i<INSTRUCTION_MAX; i++)
+		a.x = a.x * i;
+
+	g_odata[index] = a;
+
+}
 
 __global__ void
 	testReadThenWrite( float4* g_idata, float4* g_odata) 
@@ -332,7 +350,7 @@ int main(int argc, char **argv)
 
 		dim3  grid( nSizeGridX/nkernels, nSizeGridY, 1);
 		dim3  threads( nSizeBlock, 1, 1);
-	
+#if 0	
     cudaEventRecord(start_event, 0);
     // queue nkernels in separate streams and record when they are done
     for( int i=0; i<nkernels; ++i)
@@ -355,15 +373,15 @@ int main(int argc, char **argv)
 	cudaEventRecord(stop_event, 0) ;
 	cudaEventSynchronize(stop_event) ;
     cudaEventElapsedTime(&elapsed_time, start_event, stop_event) ;
-    
+#endif
 	cudaEventRecord(start_event, 0);
-	testReadThenWrite<<<grid,threads>>>( d_idata, d_odata );
+	testReadThenWriteInstMax<<<grid,threads>>>( d_idata, d_odata );
 	cudaEventRecord(stop_event, 0) ;
 	cudaEventSynchronize(stop_event) ;
-	cudaEventElapsedTime(&kernel_time, start_event, stop_event) ;
+	cudaEventElapsedTime(&elapsed_time, start_event, stop_event) ;
 
-	shrLog("Expected time for serial execution of %d kernels = %.3fms\n", nkernels, nkernels * kernel_time );
-	shrLog("Expected time for concurrent execution of %d kernels = %.3fms\n", nkernels, kernel_time );
+	//shrLog("Expected time for serial execution of %d kernels = %.3fms\n", nkernels, nkernels * kernel_time );
+	//shrLog("Expected time for concurrent execution of %d kernels = %.3fms\n", nkernels, kernel_time );
 	shrLog("Measured time for sample = %.3fms\n", elapsed_time );
 
     // release resources
