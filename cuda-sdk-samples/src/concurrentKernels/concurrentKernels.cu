@@ -25,6 +25,12 @@
 
 const char *sSDKsample = "concurrentKernels";
 
+#define		IPL				1// 1 2 4 8
+#define SIZE_ELEMENT		(1<<20)// 1M£¬Ò»°ÙÎå
+#define SIZE_BLOCK			(1024/IPL)
+#define		SIZE_KERNEL		1// 1 2 4 8
+#define SIZE_SHARED_MEMORY	((1<<10)*1)  
+
 // This is a kernel that does no real work but runs at least for a specified number of clocks
 __global__ void clock_block(clock_t* d_o, clock_t clock_count)
 { 
@@ -40,6 +46,21 @@ __global__ void clock_block(clock_t* d_o, clock_t clock_count)
 }
 
 
+__global__ void
+	testReadThenWrite( float4* g_idata, float4* g_odata) 
+{
+	int block = blockIdx.x + blockIdx.y * gridDim.x;
+	int index = threadIdx.x + IPL*block * blockDim.x;
+
+	float4 a[IPL];
+
+	for(int i=0; i<IPL; i++)
+		a[i] = g_idata[index+i * blockDim.x];
+
+	for(int i=0; i<IPL; i++)
+		g_odata[index+i * blockDim.x] = a[i];
+
+}
 // Single warp reduction kernel
 __global__ void sum(clock_t* d_clocks, int N)
 {
@@ -231,9 +252,10 @@ int findCudaDevice(int argc, const char **argv)
 
 int main(int argc, char **argv)
 {
-    int nkernels = 8;               // number of concurrent kernels
+    int nkernels = SIZE_KERNEL;               // number of concurrent kernels
     int nstreams = nkernels + 1;    // use one more stream than concurrent kernel
-    int nbytes = nkernels * sizeof(clock_t);   // number of data bytes
+	unsigned int num_threads = SIZE_ELEMENT;
+    int mem_size = num_threads * sizeof(float4);   // number of data bytes
     float kernel_time = 10; // time the kernel should run in ms
     float elapsed_time;   // timing variables
     int cuda_device = 0;
@@ -262,12 +284,19 @@ int main(int argc, char **argv)
            deviceProp.major, deviceProp.minor, deviceProp.multiProcessorCount); 
 
     // allocate host memory
-    clock_t *a = 0;                     // pointer to the array data in host memory
-    checkCudaErrors( cudaMallocHost((void**)&a, nbytes) ); 
+    float4 *h_idata = 0;                     // pointer to the array data in host memory
+    checkCudaErrors( cudaMallocHost((void**)&h_idata, mem_size) ); 
 
-    // allocate device memory
-    clock_t *d_a = 0;             // pointers to data and init value in the device memory
-    checkCudaErrors( cudaMalloc((void**)&d_a, nbytes) );
+	// allocate device memory
+	float4* d_idata;
+	checkCudaErrors( cudaMalloc( (void**) &d_idata, mem_size));
+	// copy host memory to device
+	checkCudaErrors( cudaMemcpy( d_idata, h_idata, mem_size,
+		cudaMemcpyHostToDevice) );
+
+	// allocate device memory for result
+	float4* d_odata;
+	checkCudaErrors( cudaMalloc( (void**) &d_odata, mem_size));
 
     // allocate and initialize an array of stream handles
     cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
@@ -287,40 +316,55 @@ int main(int argc, char **argv)
     for(int i = 0; i < nkernels; i++)
         checkCudaErrors( cudaEventCreateWithFlags(&(kernelEvent[i]), cudaEventDisableTiming) );
 
-    //////////////////////////////////////////////////////////////////////
-    // time execution with nkernels streams
-    clock_t total_clocks = 0;
-    clock_t time_clocks = kernel_time * deviceProp.clockRate;
+		int nSizeBlock = num_threads>SIZE_BLOCK? SIZE_BLOCK:num_threads;
+		int nSizeGridAll = (num_threads + nSizeBlock-1 )/nSizeBlock/IPL;
+		int nSizeGridX, nSizeGridY;
+		if( nSizeGridAll>SIZE_BLOCK )  
+		{
+			nSizeGridX=SIZE_BLOCK;
+			nSizeGridY= (nSizeGridAll + nSizeGridX - 1)/nSizeGridX;
+		}
+		else
+		{
+			nSizeGridX = nSizeGridAll;
+			nSizeGridY = 1;
+		}
+
+		dim3  grid( nSizeGridX/nkernels, nSizeGridY, 1);
+		dim3  threads( nSizeBlock, 1, 1);
 	
     cudaEventRecord(start_event, 0);
     // queue nkernels in separate streams and record when they are done
     for( int i=0; i<nkernels; ++i)
     {
-        clock_block<<<1,1,0,streams[i]>>>(&d_a[i], time_clocks );
-        total_clocks += time_clocks;
-        checkCudaErrors( cudaEventRecord(kernelEvent[i], streams[i]) );
+		// setup execution parameters
+
+        //clock_block<<<1,1,0,streams[i]>>>(&d_a[i], time_clocks );
+		testReadThenWrite<<<grid,threads,SIZE_SHARED_MEMORY,streams[i]>>>( d_idata+i*SIZE_ELEMENT/nkernels, d_odata+i*SIZE_ELEMENT/nkernels );
+
+        cudaEventRecord(kernelEvent[i], streams[i]) ;
 	
         // make the last stream wait for the kernel event to be recorded
-        checkCudaErrors( cudaStreamWaitEvent(streams[nstreams-1], kernelEvent[i],0) );
+        cudaStreamWaitEvent(streams[nstreams-1], kernelEvent[i],0) ;
     }
 
-    // queue a sum kernel and a copy back to host in the last stream. 
-    // the commands in this stream get dispatched as soon as all the kernel events have been recorded
-    sum<<<1,32,0,streams[nstreams-1]>>>(d_a, nkernels);
-    checkCudaErrors( cudaMemcpyAsync(a, d_a, sizeof(clock_t), cudaMemcpyDeviceToHost, streams[nstreams-1]) );
- 
+
     // at this point the CPU has dispatched all work for the GPU and can continue processing other tasks in parallel
 
     // in this sample we just wait until the GPU is done
-    checkCudaErrors( cudaEventRecord(stop_event, 0) );
-    checkCudaErrors( cudaEventSynchronize(stop_event) );
-    checkCudaErrors( cudaEventElapsedTime(&elapsed_time, start_event, stop_event) );
+	cudaEventRecord(stop_event, 0) ;
+	cudaEventSynchronize(stop_event) ;
+    cudaEventElapsedTime(&elapsed_time, start_event, stop_event) ;
     
-    shrLog("Expected time for serial execution of %d kernels = %.3fs\n", nkernels, nkernels * kernel_time/1000.0f);
-    shrLog("Expected time for concurrent execution of %d kernels = %.3fs\n", nkernels, kernel_time/1000.0f);
-    shrLog("Measured time for sample = %.3fs\n", elapsed_time/1000.0f);
+	cudaEventRecord(start_event, 0);
+	testReadThenWrite<<<grid,threads>>>( d_idata, d_odata );
+	cudaEventRecord(stop_event, 0) ;
+	cudaEventSynchronize(stop_event) ;
+	cudaEventElapsedTime(&kernel_time, start_event, stop_event) ;
 
-    bool bTestResult  = (a[0] > total_clocks);
+	shrLog("Expected time for serial execution of %d kernels = %.3fms\n", nkernels, nkernels * kernel_time );
+	shrLog("Expected time for concurrent execution of %d kernels = %.3fms\n", nkernels, kernel_time );
+	shrLog("Measured time for sample = %.3fms\n", elapsed_time );
 
     // release resources
     for(int i = 0; i < nkernels; i++) {
@@ -332,9 +376,11 @@ int main(int argc, char **argv)
 
     cudaEventDestroy(start_event);
     cudaEventDestroy(stop_event);
-    cudaFreeHost(a);
-    cudaFree(d_a);
+    cudaFreeHost(h_idata);
+	cudaFreeHost(h_idata);
+	checkCudaErrors(cudaFree(d_idata));
+	checkCudaErrors(cudaFree(d_odata));
 
     cudaDeviceReset();
-    shrQAFinishExit(argc, (const char **)argv, (bTestResult) ? QA_PASSED : QA_FAILED);
+    shrQAFinishExit(argc, (const char **)argv, QA_PASSED );
 }
