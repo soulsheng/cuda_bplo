@@ -27,10 +27,10 @@ const char *sSDKsample = "concurrentKernels";
 
 #define		IPL				1// 1 2 4 8
 #define SIZE_ELEMENT		(1<<20)// 1M£¬Ò»°ÙÎå
-#define SIZE_BLOCK			(1024/IPL)
-#define		SIZE_KERNEL		4// 1 2 4 8
+#define SIZE_BLOCK			(256/IPL)
+#define		SIZE_KERNEL		1// 1 2 4 8
 #define SIZE_SHARED_MEMORY	((1<<10)*1)  
-#define INSTRUCTION_MAX		(1<<20)
+#define INSTRUCTION_MAX		(128)
 
 // This is a kernel that does no real work but runs at least for a specified number of clocks
 __global__ void clock_block(clock_t* d_o, clock_t clock_count)
@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 
 		dim3  grid( nSizeGridX/nkernels, nSizeGridY, 1);
 		dim3  threads( nSizeBlock, 1, 1);
-#if 1	
+#if 0	
     cudaEventRecord(start_event, 0);
     // queue nkernels in separate streams and record when they are done
     for( int i=0; i<nkernels; ++i)
